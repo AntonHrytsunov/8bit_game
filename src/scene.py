@@ -7,31 +7,22 @@ class Scene:
     def __init__(self, screen, duration, backgrounds, texts, game_settings, music_file=None):
         self.screen = screen
         self.duration = duration
-        self.backgrounds = backgrounds  # Список (шлях_до_зображення, час_відображення)
+        self.backgrounds = backgrounds
         self.texts = texts
-        self.music_file = music_file  # Файл музики
+        self.music_file = music_file
         self.current_text_index = 0
-        self.current_bg_index = 0  # Поточне зображення фону
-        self.start_time = time.time()  # Час початку першого тексту
-        self.scene_start_time = self.start_time  # Час початку всієї сцени
-        self.bg_start_time = self.start_time  # Час початку поточного фону
-        self.pause_time = None
+        self.current_bg_index = 0
+        self.elapsed_time = 0  # Наш власний таймер
+        self.paused = False  # Статус паузи
         self.font = pygame.font.Font(None, 36)
 
         self.screen_resolution = tuple(game_settings.get("resolution"))
         self.fullscreen = game_settings.get("fullscreen")
 
-        # Завантажуємо перший фон
         self.bg_image = None
         self.bg_scaled = None
         self.bg_pos = (0, 0)
-
-        # Змінні для руху фону
-        self.bg_start_pos = (0, 0)
-        self.bg_end_pos = (0, 0)
-
         self.load_background(self.current_bg_index)
-
         if self.music_file:
             self.play_music()
 
@@ -41,12 +32,18 @@ class Scene:
             bg_path, _ = self.backgrounds[index]
             try:
                 self.bg_image = pygame.image.load(bg_path)
-                self.scale_background()
-                self.bg_start_time = time.time()  # Оновлення таймера фону
-                self.scene_start_time = time.time()  # Важливо! Оновлюємо загальний таймер сцени
-                self.set_background_animation()
+                self.scale_background()  # ✅ Масштабуємо фон
+
+                if self.bg_scaled is None:
+                    print(f"Помилка: фон {bg_path} не завантажився правильно!")
+
+                self.bg_start_time = self.elapsed_time  # ✅ Використовуємо наш таймер
+                self.bg_elapsed_time = 0  # ✅ Таймер для контролю зміни фону
+                self.set_background_animation()  # ✅ Запускаємо рух
+
             except pygame.error:
                 print(f"Помилка завантаження фону: {bg_path}")
+
 
     def set_background_animation(self):
         """Встановлює випадковий напрямок руху для нового фону."""
@@ -153,39 +150,43 @@ class Scene:
             self.start_time = time.time()
 
     def update(self, paused):
-        """Оновлення логіки сцени, тексту і зміни фонів."""
+        """Оновлення сцени та правильна зміна фону."""
+
         if paused:
-            if self.pause_time is None:
-                self.pause_time = time.time()
+            self.paused = True  # Зупиняємо оновлення під час паузи
             return
 
-        if self.pause_time is not None:
-            time_paused = time.time() - self.pause_time
-            self.start_time += time_paused
-            self.scene_start_time += time_paused
-            self.pause_time = None
+        if self.paused:
+            self.paused = False  # Скидаємо статус паузи
 
-        elapsed_time = time.time() - self.start_time
+        # 1️⃣ Оновлення загального часу сцени
+        self.elapsed_time += 1 / 60  # Симулюємо FPS=60 (1 сек = 60 кадрів)
+        self.bg_elapsed_time += 1 / 60  # Таймер для контролю зміни фону
 
-        if elapsed_time >= self.texts[self.current_text_index][1]:
+        # 2️⃣ Зміна тексту за таймінгами
+        if self.elapsed_time >= sum(text[1] for text in self.texts[:self.current_text_index + 1]):
             self.skip_text()
 
-        # Зміна фону
-        bg_elapsed_time = time.time() - self.bg_start_time
+        # 3️⃣ Зміна фону за таймінгами
         if self.current_bg_index < len(self.backgrounds) - 1:
-            bg_duration = self.backgrounds[self.current_bg_index][1]
-            if bg_elapsed_time >= bg_duration:
-                self.current_bg_index += 1
-                self.load_background(self.current_bg_index)
+            next_bg_time = sum(
+                bg[1] for bg in self.backgrounds[:self.current_bg_index + 1])  # Загальний час для поточного фону
 
-        # Оновлення позиції фону
-        scene_elapsed_time = time.time() - self.scene_start_time
-        progress = min(1, scene_elapsed_time / self.duration)
+            if self.elapsed_time >= next_bg_time:
+                self.current_bg_index += 1  # ✅ Переходимо до наступного фону
+                self.load_background(self.current_bg_index)  # ✅ Завантажуємо його
+                self.set_background_animation()  # ✅ Запускаємо рух
+                self.bg_elapsed_time = 0  # ✅ Скидаємо таймер фону
+                self.render()  # ✅ Оновлюємо екран після зміни фону
+
+        # 4️⃣ Оновлення позиції фону (анімація руху)
+        progress = min(1, self.bg_elapsed_time / self.backgrounds[self.current_bg_index][1])
 
         self.bg_pos = (
             self.bg_start_pos[0] + (self.bg_end_pos[0] - self.bg_start_pos[0]) * progress,
             self.bg_start_pos[1] + (self.bg_end_pos[1] - self.bg_start_pos[1]) * progress
         )
+
 
     def render(self):
         """Малює сцену на екрані."""
@@ -203,15 +204,18 @@ class Scene:
         pygame.display.flip()
 
     def is_finished(self):
-        """Перевіряє, чи завершилася сцена (після останнього фону)."""
+        """Перевіряє, чи завершилася сцена (всі фони показані повністю)."""
+
+        # Якщо ще є фони для показу – сцена не завершена
         if self.current_bg_index < len(self.backgrounds) - 1:
             return False
 
-        bg_elapsed_time = time.time() - self.bg_start_time
+        # Отримуємо загальний час останнього фону
         last_bg_duration = self.backgrounds[-1][1]
 
-        if bg_elapsed_time < last_bg_duration:
+        # Якщо загальний час сцени ще не закінчився – продовжуємо
+        if self.elapsed_time < sum(bg[1] for bg in self.backgrounds):
             return False
 
-        self.stop_music()
+        self.stop_music()  # ✅ Зупиняємо музику після завершення сцени
         return True
