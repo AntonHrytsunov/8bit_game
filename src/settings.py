@@ -7,8 +7,8 @@ class GameSettings:
         self.filename = filename
         # Значення за замовчуванням
         self.defaults = {
-            "fullscreen": False,
-            "resolution": [800, 600],
+            "fullscreen": True,
+            "resolution": [1280, 800],
             "difficulty": "Легко"
         }
         self.settings = {}
