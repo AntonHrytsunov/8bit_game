@@ -154,3 +154,47 @@ class Settings:
                         new_diff = self.settings_values[option][current_index]
                         self.game_settings.update("difficulty", new_diff)
         return None
+
+
+class PauseMenu:
+    def __init__(self, screen, options, background, font=None):
+        self.screen = screen
+        self.background = background  # Збережене зображення гри
+        self.options = options  # Наприклад: ["Продовжити гру", "Вийти у систему"]
+        self.current_selection = 0
+        self.font = font or pygame.font.SysFont("Arial", 36)
+        self.selected_color = (255, 255, 0)
+        self.unselected_color = (255, 255, 255)
+
+    def display(self):
+        # Спершу малюємо збережене зображення гри
+        self.screen.blit(self.background, (0, 0))
+        # Тепер створюємо поверхню з підтримкою альфа-каналу
+        overlay = pygame.Surface(self.screen.get_size(), flags=pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))  # Чорний з прозорістю 150
+        self.screen.blit(overlay, (0, 0))
+
+        screen_rect = self.screen.get_rect()
+        total_options = len(self.options)
+        option_height = self.font.get_height() + 10
+        start_y = (screen_rect.height - total_options * option_height) // 2
+
+        for i, option in enumerate(self.options):
+            color = self.selected_color if i == self.current_selection else self.unselected_color
+            text_surface = self.font.render(option, True, color)
+            text_rect = text_surface.get_rect(center=(screen_rect.width // 2, start_y + i * option_height))
+            self.screen.blit(text_surface, text_rect)
+        pygame.display.flip()
+
+    def handle_events(self, event):
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                # Повертаємо -1, щоб сигналізувати про завершення меню паузи (продовження гри)
+                return -1
+            elif event.key == pygame.K_UP:
+                self.current_selection = (self.current_selection - 1) % len(self.options)
+            elif event.key == pygame.K_DOWN:
+                self.current_selection = (self.current_selection + 1) % len(self.options)
+            elif event.key == pygame.K_RETURN:
+                return self.current_selection
+        return None

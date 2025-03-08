@@ -1,6 +1,7 @@
 # src/game.py
 import pygame
 import sys
+from menu import PauseMenu  # переконайтеся, що цей модуль створено та містить клас PauseMenu
 
 class Game:
     def __init__(self, screen):
@@ -8,9 +9,8 @@ class Game:
         self.clock = pygame.time.Clock()
         self.FPS = 60
         self.running = True
-
-        # Ініціалізуйте тут додаткові компоненти, наприклад, рівень, героя тощо
-        self.level = None  # Поки що можна залишити None; згодом ініціалізуйте генератор рівнів
+        # Тут можна ініціалізувати рівень, персонажа тощо
+        self.level = None  # поки що None
 
     def run(self):
         # Основний цикл гри
@@ -27,14 +27,39 @@ class Game:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
-            # Тут додайте обробку інших подій, як-от натискання клавіш для руху героя
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    # Викликаємо меню паузи при натисканні ESC
+                    self.pause()
+                # Обробка інших клавіш (наприклад, для руху героя) може додаватись тут
 
     def update(self):
-        # Оновлення стану гри (логіка рівня, рух об’єктів, колізії тощо)
+        # Оновлення логіки гри (рух, колізії тощо)
         pass
 
     def render(self):
-        # Рендеринг: заливка фону, відображення рівня, героя, ворогів тощо
-        self.screen.fill((0, 0, 0))
-        # Тут малюємо всі ігрові об’єкти
+        # Рендеринг: очищення екрана та відображення ігрових об'єктів
+        self.screen.fill((0, 0, 200))
+        # Тут малюються об'єкти гри
         pygame.display.flip()
+
+    def pause(self):
+        pause_options = ["Продовжити гру", "Вийти у систему"]
+        # Зберігаємо поточний вигляд екрану як фон паузи
+        background = self.screen.copy()
+        pause_menu = PauseMenu(self.screen, pause_options, background)
+        paused = True
+        while paused:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                    paused = False
+                else:
+                    selection = pause_menu.handle_events(event)
+                    if selection is not None:
+                        if selection == -1 or pause_options[selection] == "Продовжити гру":
+                            paused = False
+                        elif pause_options[selection] == "Вийти у систему":
+                            pygame.quit()
+                            sys.exit()
+            pause_menu.display()
