@@ -39,7 +39,7 @@ class Game:
 
     def render(self):
         # Рендеринг: очищення екрана та відображення ігрових об'єктів
-        self.screen.fill((0, 0, 200))
+        self.screen.fill((0, 0, 0))
         # Тут малюються об'єкти гри
         pygame.display.flip()
 

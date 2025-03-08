@@ -6,7 +6,7 @@ from settings import GameSettings
 
 def main():
     pygame.init()
-    WIDTH, HEIGHT = 800, 600
+    WIDTH, HEIGHT = 700, 700
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("8bit_game")
     clock = pygame.time.Clock()
