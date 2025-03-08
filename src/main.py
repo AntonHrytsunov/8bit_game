@@ -5,6 +5,8 @@ from game import Game
 from settings import GameSettings
 import save_game, delete_old_saves, exit_win
 
+
+
 def main():
     pygame.init()
     WIDTH, HEIGHT = 700, 700
@@ -24,11 +26,16 @@ def main():
     sound_manager.play_random_sound()  # Запуск музики в меню
 
     in_menu = True
+    paused = False  # Глобальна пауза
+    current_scene = None  # Для збереження активної сцени
+
+
     while in_menu:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 sys.exit()
+
             selection_menu = menu.handle_events(event)
             if selection_menu is not None:
                 if menu.has_save is False:
@@ -39,6 +46,49 @@ def main():
                         save_game.delete_all_saves()
                         save_game.create_new_save()
                         menu.update_continue_option()
+
+                    elif menu_options[selection_menu] == "Налаштування":
+                        print("Відкривається вікно з налаштуваннями")
+                        in_menu = False
+                        settings_options = ["Повноекранний режим", "Роздільна здатність екрану", "Складність гри", "Назад"]
+                        settings = Settings(screen, settings_options, game_settings)
+                        in_settings = True
+                        while in_settings:
+                            for event in pygame.event.get():
+                                if event.type == pygame.QUIT:
+                                    pygame.quit()
+                                    sys.exit()
+                                selection_settings = settings.handle_events(event)
+                                if selection_settings is not None:
+                                    if settings_options[selection_settings] == "Назад":
+                                        print("Повернення у меню.")
+                                        in_settings = False
+                                        in_menu = True
+                            settings.display()
+                    elif menu_options[selection_menu] == "Вийти":
+                            print("Запуск вікна виходу з гри.")
+                            in_menu = False
+                            exit_windows = exit_win.Out(screen)
+                            out_try = True
+                            while out_try:
+                                for event in pygame.event.get():  # Оновлюємо події всередині циклу
+                                    if event.type == pygame.QUIT:
+                                        pygame.quit()
+                                        sys.exit()
+                                    confirm_selection = exit_windows.handle_events(event)
+                                    if confirm_selection == "Так":
+                                        print("Завершення гри.")
+                                        pygame.quit()
+                                        sys.exit()
+                                    elif confirm_selection == "Ні":
+                                        print("Повернення у меню.")
+                                        out_try = False
+                                        in_menu = True  # Повернення у меню без виходу з гри
+                                        menu.update_continue_option()
+
+                                exit_windows.display()  # Оновлення екрану
+                                pygame.display.update()
+                    continue  # Пропускаємо залишок виконання цього блоку
                 else:
                     if menu_options[selection_menu] == "Нова гра":
                         print("Запуск вікна видалення збережень")
@@ -59,6 +109,7 @@ def main():
                                     confirming = False
                                     in_menu = False
                                     sound_manager.stop_music()
+
                                 elif confirm_selection == "Ні":
                                     print("Повернення у меню.")
                                     confirming = False
@@ -130,7 +181,8 @@ def main():
 
 
     # Запуск гри
-    game = Game(screen)
+    # Запуск гри з передачею game_settings
+    game = Game(screen, game_settings)
     game.run()
 
 if __name__ == "__main__":
