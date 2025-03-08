@@ -9,7 +9,7 @@ def main():
     pygame.init()
     WIDTH, HEIGHT = 700, 700
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("8bit_game")
+    pygame.display.set_caption("Escape from the White Castle")
     clock = pygame.time.Clock()
     FPS = 60
 
