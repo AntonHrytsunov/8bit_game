@@ -3,7 +3,7 @@ import sys
 from menu import *
 from game import Game
 from settings import GameSettings
-import save_game, delete_old_saves
+import save_game, delete_old_saves, exit_win
 
 def main():
     pygame.init()
@@ -93,8 +93,30 @@ def main():
                                         in_menu = True
                             settings.display()
                     elif menu_options[selection_menu] == "Вийти":
-                        pygame.quit()
-                        sys.exit()
+                            print("Запуск вікна виходу з гри.")
+                            in_menu = False
+                            exit_windows = exit_win.Out(screen)
+                            out_try = True
+                            while out_try:
+                                for event in pygame.event.get():  # Оновлюємо події всередині циклу
+                                    if event.type == pygame.QUIT:
+                                        pygame.quit()
+                                        sys.exit()
+                                    confirm_selection = exit_windows.handle_events(event)
+                                    if confirm_selection == "Так":
+                                        print("Завершення гри.")
+                                        pygame.quit()
+                                        sys.exit()
+                                    elif confirm_selection == "Ні":
+                                        print("Повернення у меню.")
+                                        out_try = False
+                                        in_menu = True  # Повернення у меню без виходу з гри
+                                        menu.update_continue_option()
+
+                                exit_windows.display()  # Оновлення екрану
+                                pygame.display.update()
+                    continue  # Пропускаємо залишок виконання цього блоку
+
             menu.display()
             clock.tick(FPS)
 

@@ -11,7 +11,7 @@ class Out:
         self.current_selection = 1
         self.selected_color = (255, 255, 0)
         self.unselected_color = (255, 255, 255)
-        self.background_path = "../assets/menu/delete_old_saves.png"
+        self.background_path = "../assets/menu/out_img.png"
         self.background = self.load_background()
 
     def load_background(self):
@@ -29,7 +29,7 @@ class Out:
         start_y = (screen_rect.height - total_options * option_height) // 2
 
         # Виділення питання напівпрозорим прямокутником
-        question_surface = self.font.render("Всі минулі збереження будуть видалені. Продовжити?", True,
+        question_surface = self.font.render("Завершити пригоду?", True,
                                             self.unselected_color)
         question_rect = question_surface.get_rect(center=(screen_rect.width // 2, screen_rect.height // 3))
 
