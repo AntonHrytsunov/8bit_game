@@ -1,6 +1,7 @@
 import pygame
 from settings import get_all_resolutions
 import random, os
+import save_game
 
 
 class Menu:
@@ -11,8 +12,14 @@ class Menu:
         self.font = font or pygame.font.Font("../assets/menu_font.otf", 28)
         self.selected_color = (255, 255, 0)
         self.unselected_color = (255, 255, 255)
+        self.disabled_color = (128, 128, 128)
         self.background_path = "../assets/menu/image_menu.png"
         self.background = self.load_background()
+        self.update_continue_option()
+
+    def update_continue_option(self):
+        """Перевіряє, чи є файли збереження, і робить опцію 'Продовжити гру' активною або ні."""
+        self.has_save = save_game.get_latest_save() is not None
 
     def load_background(self):
         if os.path.exists(self.background_path):
@@ -29,8 +36,13 @@ class Menu:
         start_y = (screen_rect.height - total_options * option_height) // 2
 
         for i, option in enumerate(self.options):
-            color = self.selected_color if i == self.current_selection else self.unselected_color
-            rect_alpha = 180 if i == self.current_selection else 128  # 70% і 50% прозорості
+            is_selected = i == self.current_selection
+            is_disabled = option == "Продовжити гру" and not self.has_save
+            color = self.selected_color if is_selected else self.unselected_color
+            if is_disabled:
+                color = self.disabled_color
+
+            rect_alpha = 180 if is_selected else 128  # 70% і 50% прозорості
             rect_surface = pygame.Surface((screen_rect.width // 2, option_height), pygame.SRCALPHA)
             rect_surface.fill((0, 0, 0, rect_alpha))
             rect_rect = rect_surface.get_rect(center=(screen_rect.width // 2, start_y + i * option_height))
@@ -39,15 +51,22 @@ class Menu:
             text_surface = self.font.render(option, True, color)
             text_rect = text_surface.get_rect(center=(screen_rect.width // 2, start_y + i * option_height))
             self.screen.blit(text_surface, text_rect)
+
         pygame.display.flip()
 
     def handle_events(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self.current_selection = (self.current_selection - 1) % len(self.options)
+                sound_manager = SoundManager(volume=0.5)  # Гучність 50%
+                sound_manager.play_random_sound()
             elif event.key == pygame.K_DOWN:
                 self.current_selection = (self.current_selection + 1) % len(self.options)
+                sound_manager = SoundManager(volume=0.5)  # Гучність 50%
+                sound_manager.play_random_sound()
             elif event.key == pygame.K_RETURN:
+                sound_manager = SoundManager(sound_folder="../assets/menu/sound_return", volume=0.5)  # Гучність 50%
+                sound_manager.play_random_sound()
                 return self.current_selection
         return None
 
@@ -136,12 +155,25 @@ class Settings:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 self.current_selection = (self.current_selection - 1) % len(self.options)
+                sound_manager = SoundManager(volume=0.5)  # Гучність 50%
+                sound_manager.play_random_sound()
             elif event.key == pygame.K_DOWN:
                 self.current_selection = (self.current_selection + 1) % len(self.options)
+                sound_manager = SoundManager(volume=0.5)  # Гучність 50%
+                sound_manager.play_random_sound()
             elif event.key == pygame.K_RETURN:
+                option = self.options[self.current_selection]
+                if option == "Назад":
+                    sound_manager = SoundManager(sound_folder="../assets/menu/sound_return", volume=0.5)  # Гучність 50%
+                    sound_manager.play_random_sound()
+                pass
                 return self.current_selection
             elif event.key in (pygame.K_LEFT, pygame.K_RIGHT):
                 option = self.options[self.current_selection]
+                if option != "Назад":
+                    sound_manager = SoundManager(sound_folder="../assets/menu/sound_return", volume=0.5)  # Гучність 50%
+                    sound_manager.play_random_sound()
+                pass
                 if option != "Назад" and option in self.settings_values:
                     current_index = self.current_values[option]
                     if event.key == pygame.K_LEFT:
@@ -213,3 +245,42 @@ class PauseMenu:
             elif event.key == pygame.K_RETURN:
                 return self.current_selection
         return None
+
+
+class SoundManager:
+    def __init__(self, sound_folder="../assets/menu/sound_menu", volume=1.0):
+        pygame.mixer.init()
+        self.sound_folder = sound_folder
+        self.volume = volume
+        self.sounds = self._load_sounds()
+
+    def _load_sounds(self):
+        """Завантажує всі звукові файли з папки."""
+        if not os.path.exists(self.sound_folder):
+            print(f"Папка {self.sound_folder} не існує!")
+            return []
+
+        return [os.path.join(self.sound_folder, f) for f in os.listdir(self.sound_folder) if
+                f.endswith((".wav", ".mp3", ".ogg"))]
+
+    def play_random_sound(self):
+        """Відтворює випадковий звук із папки."""
+        if not self.sounds:
+            print("Немає доступних звуків для відтворення.")
+            return
+
+        sound_file = random.choice(self.sounds)
+        sound = pygame.mixer.Sound(sound_file)
+        sound.set_volume(self.volume)
+        sound.play()
+
+
+    def set_volume(self, volume):
+        """Змінює гучність звуків (0.0 - 1.0)."""
+        self.volume = max(0.0, min(1.0, volume))  # Обмежуємо значення між 0.0 і 1.0
+
+
+    def stop_music(self):
+        pygame.time.delay(1000)
+        pygame.mixer.stop()
+        pygame.mixer.music.unload()

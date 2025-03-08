@@ -14,6 +14,7 @@ class Game:
 
     def run(self):
         # Основний цикл гри
+        print("Гру запущено.")
         while self.running:
             self.handle_events()
             self.update()
