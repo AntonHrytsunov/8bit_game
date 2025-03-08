@@ -18,19 +18,27 @@ class Game:
     def run(self):
         print("Гру запущено.")
         while self.running:
-            self.handle_events()
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        self.toggle_pause()
+
+                if self.scene_playing:
+                    self.scene.handle_events(event)  # Викликаємо обробку подій для сцени!
 
             if self.paused:
-                self.show_pause_menu()  # Відображаємо меню паузи
-                continue  # Пропускаємо оновлення та рендеринг гри
+                self.show_pause_menu()
+                continue
 
             if self.scene_playing:
-                self.scene.update(self.paused)  # Оновлення сцени тільки якщо немає паузи
+                self.scene.update(self.paused)
                 self.scene.render()
 
-                if self.scene.is_finished():  # Якщо сцена завершена
-                    self.scene_playing = False  # Вимикаємо сцену
-                    self.start_level()  # Запускаємо рівень
+                if self.scene.is_finished():
+                    self.scene_playing = False
+                    self.start_level()
             else:
                 self.update()
                 self.render()

@@ -1,64 +1,128 @@
 import pygame
 import time
+import random
 
 
 class Scene:
     def __init__(self, screen, duration, background, texts, game_settings):
-        """
-        Базовий клас для всіх сцен.
-
-        :param screen: Екран Pygame, на якому буде відображатися сцена
-        :param duration: Тривалість сцени у секундах
-        :param background: Зображення або колір фону сцени
-        :param texts: Список кортежів (текст, час відображення)
-        :param game_settings: Об'єкт GameSettings для отримання розширення екрану та режиму
-        """
         self.screen = screen
         self.duration = duration
         self.background = background
         self.texts = texts
         self.current_text_index = 0
         self.start_time = time.time()
-        self.elapsed_time = 0
-        self.pause_time = None  # Фіксує час, коли сцена ставиться на паузу
-        self.font = pygame.font.Font(None, 36)  # Шрифт для тексту
+        self.scene_start_time = self.start_time  # Час початку всієї сцени
+        self.pause_time = None
+        self.font = pygame.font.Font(None, 36)
 
         self.screen_resolution = tuple(game_settings.get("resolution"))
         self.fullscreen = game_settings.get("fullscreen")
 
         # Завантаження фону
         self.bg_image = None
+        self.bg_scaled = None  # Масштабоване зображення
+        self.bg_pos = (0, 0)  # Початкова позиція
+
+        # Змінні для анімації руху фону
+        self.bg_start_pos = (0, 0)  # Початкова позиція (X, Y)
+        self.bg_end_pos = (0, 0)  # Кінцева позиція (X, Y)
+
         if isinstance(self.background, str):
             try:
                 self.bg_image = pygame.image.load(self.background)
-                self.bg_image = pygame.transform.scale(self.bg_image, self.screen_resolution)
+                self.scale_background()  # Масштабуємо зображення
             except pygame.error:
                 print(f"Помилка завантаження фону: {self.background}")
 
+    def scale_background(self):
+        """Масштабує фон так, щоб один його край примикав до краю екрана, а рух відбувався у випадковому напрямку."""
+        if self.bg_image:
+            bg_width, bg_height = self.bg_image.get_size()
+            screen_width, screen_height = self.screen_resolution
+
+            # Обчислюємо коефіцієнт масштабування для покриття екрану без спотворень
+            scale_factor = max(screen_width / bg_width, screen_height / bg_height)
+
+            # Нові розміри зображення
+            new_width = int(bg_width * scale_factor)
+            new_height = int(bg_height * scale_factor)
+
+            # Масштабуємо зображення
+            self.bg_scaled = pygame.transform.smoothscale(self.bg_image, (new_width, new_height))
+
+            # Визначаємо, чи фон ширший або вищий за екран
+            overflow_x = new_width - screen_width
+            overflow_y = new_height - screen_height
+
+            # Визначаємо можливі напрямки руху
+            possible_directions = []
+            if overflow_x > 0:
+                possible_directions.extend(["left", "right"])
+            if overflow_y > 0:
+                possible_directions.extend(["up", "down"])
+
+            # Випадково обираємо один з можливих напрямків руху
+            move_direction = random.choice(possible_directions)
+
+            # Встановлюємо початкову позицію залежно від напрямку
+            if move_direction == "left":
+                self.bg_start_pos = (0, -overflow_y // 2)
+                self.bg_end_pos = (-overflow_x, -overflow_y // 2)
+            elif move_direction == "right":
+                self.bg_start_pos = (-overflow_x, -overflow_y // 2)
+                self.bg_end_pos = (0, -overflow_y // 2)
+            elif move_direction == "up":
+                self.bg_start_pos = (-overflow_x // 2, 0)
+                self.bg_end_pos = (-overflow_x // 2, -overflow_y)
+            elif move_direction == "down":
+                self.bg_start_pos = (-overflow_x // 2, -overflow_y)
+                self.bg_end_pos = (-overflow_x // 2, 0)
+
+            # Початкова позиція
+            self.bg_pos = self.bg_start_pos
+
+    def handle_events(self, event):
+        """Обробка подій: при натисканні `Space` перемикає текст."""
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+            self.skip_text()
+
+    def skip_text(self):
+        """Пропускає поточний текст і відображає наступний."""
+        if self.current_text_index < len(self.texts) - 1:
+            remaining_time = self.texts[self.current_text_index][1] - (time.time() - self.start_time)
+            self.duration -= max(0, remaining_time)
+            self.current_text_index += 1
+            self.start_time = time.time()
+
     def update(self, paused):
-        """Оновлення логіки сцени (перемикання тексту тощо)."""
+        """Оновлення логіки сцени та плавного руху фону."""
         if paused:
-            if self.pause_time is None:  # Фіксуємо час паузи тільки один раз
+            if self.pause_time is None:
                 self.pause_time = time.time()
             return
 
         if self.pause_time is not None:
-            # Компенсуємо час паузи
-            self.start_time += time.time() - self.pause_time
-            self.pause_time = None  # Скидаємо значення після виходу з паузи
+            time_paused = time.time() - self.pause_time
+            self.start_time += time_paused
+            self.scene_start_time += time_paused
+            self.pause_time = None
 
-        self.elapsed_time = time.time() - self.start_time
+        elapsed_time = time.time() - self.scene_start_time  # Час, що пройшов з початку сцени
+        progress = min(1, elapsed_time / self.duration)  # Прогрес сцени (0.0 - 1.0)
 
-        if self.current_text_index < len(self.texts) - 1:
-            text_duration = self.texts[self.current_text_index][1]
-            if self.elapsed_time >= text_duration:
-                self.current_text_index += 1
-                self.start_time = time.time()
+        # Лінійне зміщення від початкової до кінцевої позиції
+        self.bg_pos = (
+            self.bg_start_pos[0] + (self.bg_end_pos[0] - self.bg_start_pos[0]) * progress,
+            self.bg_start_pos[1] + (self.bg_end_pos[1] - self.bg_start_pos[1]) * progress
+        )
+
+        if elapsed_time >= self.texts[self.current_text_index][1]:
+            self.skip_text()
 
     def render(self):
         """Малює сцену на екрані."""
-        if self.bg_image:
-            self.screen.blit(self.bg_image, (0, 0))
+        if self.bg_scaled:
+            self.screen.blit(self.bg_scaled, self.bg_pos)  # Відображаємо фон, що рухається
         else:
             self.screen.fill(self.background)
 
@@ -78,4 +142,4 @@ class Scene:
 
     def is_finished(self):
         """Перевіряє, чи завершилася сцена."""
-        return self.elapsed_time >= self.duration
+        return time.time() - self.scene_start_time >= self.duration
