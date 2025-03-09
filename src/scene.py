@@ -15,6 +15,7 @@ class Scene:
         self.elapsed_time = 0
         self.paused = False
         self.font = pygame.font.Font(None, 36)
+        self.text_start_time = time.time()
 
         self.screen_resolution = tuple(game_settings.get("resolution"))
         self.fullscreen = game_settings.get("fullscreen")
@@ -170,10 +171,14 @@ class Scene:
 
 
     def skip_text(self):
-        """Пропускає поточний текст і відображає наступний."""
-        if self.current_text_index < len(self.texts) - 1:
-            self.current_text_index += 1
-            self.start_time = time.time()
+        """Пропускає поточний текст і відображає наступний, якщо дозволено."""
+        _, text_duration, min_skip_time = self.texts[self.current_text_index]
+        elapsed_text_time = time.time() - self.text_start_time
+
+        if elapsed_text_time >= min_skip_time:
+            if self.current_text_index < len(self.texts) - 1:
+                self.current_text_index += 1
+                self.text_start_time = time.time()
 
 
     def update(self, paused):
@@ -185,8 +190,12 @@ class Scene:
         if self.paused:
             self.paused = False  # Виходимо з паузи
 
-        if self.elapsed_time >= sum(text[1] for text in self.texts[:self.current_text_index + 1]):
+        _, text_duration, _ = self.texts[self.current_text_index]
+        elapsed_text_time = time.time() - self.text_start_time
+
+        if time.time() - self.text_start_time >= text_duration:
             self.skip_text()
+
 
         self.elapsed_time += 1 / 60  # Оновлюємо таймер як зазвичай
 
@@ -235,7 +244,7 @@ class Scene:
             self.screen.fill((0, 0, 0))
 
         self.font = self.get_scaled_font()
-        text, _ = self.texts[self.current_text_index]
+        text, _, _ = self.texts[self.current_text_index]
         text_surface = self.font.render(text, True, (255, 255, 255))
 
         text_rect = text_surface.get_rect(center=(self.screen_resolution[0] // 2, self.screen_resolution[1] - 100))
