@@ -3,6 +3,8 @@ import sys
 from menu import PauseMenu  # Меню паузи
 from scene_intro import IntroScene  # Вступна сцена
 import hero_creator
+from src.hero_creator import HeroCreator
+
 
 class Game:
     def __init__(self, screen, game_settings):
@@ -89,7 +91,7 @@ class Game:
     def start_level(self):
         """Запускає рівень після завершення сцени"""
         print("Інтро завершено, запускаємо перший рівень!")
-        self.scene = IntroScene(self.screen, self.game_settings)
+        self.scene = HeroCreator(self.screen, self.game_settings)
         self.scene_playing = True  # Активуємо рівень як сцену
 
     def show_pause_menu(self):

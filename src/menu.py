@@ -177,9 +177,9 @@ class Settings:
                 if option != "Назад" and option in self.settings_values:
                     current_index = self.current_values[option]
                     if event.key == pygame.K_LEFT:
-                        current_index = (current_index - 1) % len(self.settings_values[option])
-                    elif event.key == pygame.K_RIGHT:
                         current_index = (current_index + 1) % len(self.settings_values[option])
+                    elif event.key == pygame.K_RIGHT:
+                        current_index = (current_index - 1) % len(self.settings_values[option])
                     self.current_values[option] = current_index
 
                     # Оновлюємо GameSettings відповідно до вибраного значення

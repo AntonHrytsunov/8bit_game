@@ -7,11 +7,11 @@ class IntroScene(Scene):
             screen=screen,
             backgrounds=[
                 ("../assets/scene/intro/image1.png", 25, 2, 2, True),
-                ("../assets/scene/intro/image2.png", 23, 2, 2, True),
+                ("../assets/scene/intro/image2.png", 23, 2, 2, True, "down"),
                 ("../assets/scene/intro/image3.png", 30, 2, 2, True),
                 ("../assets/scene/intro/image4.png", 15, 1, 4, True),
                 ("../assets/scene/intro/image5.png", 18, 1, 4, True),
-                ("../assets/scene/intro/black.png", 7, 4, 0, False),
+                ("../assets/scene/intro/black.png", 7, 4, 0, False, "up")
             ],
             texts=[
                 # Перше зображення
@@ -33,9 +33,9 @@ class IntroScene(Scene):
                 # П'яте зображення
                 (" ", 5, 5),
                 ("Ви опинились на стежині посеред темного лісу", 5, 5),
-                (" ", 3, 3),
+                (" ", 2, 2),
                 ("Куди ви йшли, та навіть хто ви - невідомо.", 5, 5),
-                (" ", 5, 5),
+                (" ", 3, 3),
                 ("То хто ви такий? ", 5, 5),
                 (" ", 10, 10),
 

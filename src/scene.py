@@ -6,14 +6,14 @@ import random
 class Scene:
     def __init__(self, screen, backgrounds, texts, game_settings, music_file=None):
         self.screen = screen
-        self.backgrounds = backgrounds
+        self.backgrounds = backgrounds  # [(шлях, тривалість, fade-in, fade-out, move, move_direction)]
         self.texts = texts
         self.music_file = music_file
         self.current_text_index = 0
         self.current_bg_index = 0
         self.elapsed_time = 0
         self.paused = False
-        self.font = pygame.font.Font(None, 36)
+        self.font = pygame.font.Font("../assets/menu_font.otf", 30)
         self.text_start_time = time.time()
 
         self.screen_resolution = tuple(game_settings.get("resolution"))
@@ -32,6 +32,7 @@ class Scene:
         self.bg_start_pos = (0, 0)
         self.bg_end_pos = (0, 0)
         self.should_move = False
+        self.move_direction = None
 
         self.paused_time = 0  # Час, коли була поставлена пауза
         self.last_update_time = 0  # Останній момент оновлення
@@ -40,10 +41,12 @@ class Scene:
         if self.music_file:
             self.play_music()
 
+
     def load_background(self, index):
         """Завантажує фон за його індексом у списку `backgrounds`."""
         if index < len(self.backgrounds):
-            bg_path, duration, fade_in_duration, fade_out_duration, self.should_move = self.backgrounds[index]
+            bg_path, duration, fade_in_duration, fade_out_duration, self.should_move, *optional_move_direction = self.backgrounds[index]
+            self.move_direction = optional_move_direction[0] if optional_move_direction else None
             try:
                 self.bg_image = pygame.image.load(bg_path).convert_alpha()
                 self.scale_background()
@@ -64,11 +67,13 @@ class Scene:
                     self.bg_alpha = 255
                     self.fade_state = None  # Якщо fade-in нема, просто показуємо зображення
 
+                self.set_background_animation()
             except pygame.error:
                 print(f"Помилка завантаження фону: {bg_path}")
 
+
     def set_background_animation(self):
-        """Встановлює випадковий напрямок руху для нового фону з плавним прискоренням і сповільненням."""
+        """Встановлює напрямок руху для фону, якщо він заданий, або обирає випадковий напрямок."""
         if self.bg_scaled:
             bg_width, bg_height = self.bg_scaled.get_size()
             screen_width, screen_height = self.screen_resolution
@@ -76,18 +81,23 @@ class Scene:
             overflow_x = bg_width - screen_width
             overflow_y = bg_height - screen_height
 
+            if not self.should_move:
+                return
+
+            # Визначаємо можливі напрямки руху
             possible_directions = []
             if overflow_x > 0:
                 possible_directions.extend(["left", "right"])
             if overflow_y > 0:
                 possible_directions.extend(["up", "down"])
 
-            if not possible_directions:
-                self.should_move = False
-                return
+            # 🔹 Використовуємо move_direction, якщо він вказаний і можливий
+            if self.move_direction in possible_directions:
+                move_direction = self.move_direction
+            else:
+                move_direction = random.choice(possible_directions) if possible_directions else None
 
-            move_direction = random.choice(possible_directions)
-
+            # 🔹 Примусово встановлюємо рух у вказаному напрямку
             if move_direction == "left":
                 self.bg_start_pos = (0, -overflow_y // 2)
                 self.bg_end_pos = (-overflow_x, -overflow_y // 2)
@@ -102,7 +112,7 @@ class Scene:
                 self.bg_end_pos = (-overflow_x // 2, 0)
 
             self.bg_pos = self.bg_start_pos
-            self.animation_progress = 0  # Початковий стан анімації (від 0 до 1)
+            self.animation_progress = 0  # Початковий стан анімації
 
 
     def scale_background(self):
@@ -258,6 +268,15 @@ class Scene:
         text_surface = self.font.render(text, True, (255, 255, 255))
 
         text_rect = text_surface.get_rect(center=(self.screen_resolution[0] // 2, self.screen_resolution[1] - 100))
+        if text.strip():
+            padding = 10  # Відступи довкола тексту
+            bg_rect = pygame.Rect(text_rect.left - padding, text_rect.top - padding,
+                              text_rect.width + padding * 2, text_rect.height + padding * 2)
+
+        # Створюємо поверхню для фону
+            text_bg = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            text_bg.fill((0, 0, 0, 150))
+            self.screen.blit(text_bg, bg_rect.topleft)
 
         self.screen.blit(text_surface, text_rect)
         pygame.display.flip()
@@ -281,8 +300,8 @@ class Scene:
     def get_scaled_font(self):
         """Обчислює розмір шрифту залежно від висоти екрану."""
         screen_height = self.screen_resolution[1]
-        font_size = max(20, int(screen_height * 0.04))  # Мінімальний розмір 20px, але адаптується
-        return pygame.font.Font(None, font_size)
+        font_size = max(14, int(screen_height * 0.03))
+        return pygame.font.Font("../assets/menu_font.otf", font_size)
 
 
     def update_screen_settings(self, new_resolution, fullscreen):
