@@ -4,9 +4,8 @@ import random
 
 
 class Scene:
-    def __init__(self, screen, duration, backgrounds, texts, game_settings, music_file=None):
+    def __init__(self, screen, backgrounds, texts, game_settings, music_file=None):
         self.screen = screen
-        self.duration = duration
         self.backgrounds = backgrounds
         self.texts = texts
         self.music_file = music_file
@@ -32,6 +31,7 @@ class Scene:
 
         self.bg_start_pos = (0, 0)
         self.bg_end_pos = (0, 0)
+        self.should_move = False
 
         self.paused_time = 0  # Час, коли була поставлена пауза
         self.last_update_time = 0  # Останній момент оновлення
@@ -43,7 +43,7 @@ class Scene:
     def load_background(self, index):
         """Завантажує фон за його індексом у списку `backgrounds`."""
         if index < len(self.backgrounds):
-            bg_path, duration, fade_in_duration, fade_out_duration = self.backgrounds[index]
+            bg_path, duration, fade_in_duration, fade_out_duration, self.should_move = self.backgrounds[index]
             try:
                 self.bg_image = pygame.image.load(bg_path).convert_alpha()
                 self.scale_background()
@@ -67,9 +67,8 @@ class Scene:
             except pygame.error:
                 print(f"Помилка завантаження фону: {bg_path}")
 
-
     def set_background_animation(self):
-        """Встановлює випадковий напрямок руху для нового фону."""
+        """Встановлює випадковий напрямок руху для нового фону з плавним прискоренням і сповільненням."""
         if self.bg_scaled:
             bg_width, bg_height = self.bg_scaled.get_size()
             screen_width, screen_height = self.screen_resolution
@@ -82,6 +81,10 @@ class Scene:
                 possible_directions.extend(["left", "right"])
             if overflow_y > 0:
                 possible_directions.extend(["up", "down"])
+
+            if not possible_directions:
+                self.should_move = False
+                return
 
             move_direction = random.choice(possible_directions)
 
@@ -99,6 +102,7 @@ class Scene:
                 self.bg_end_pos = (-overflow_x // 2, 0)
 
             self.bg_pos = self.bg_start_pos
+            self.animation_progress = 0  # Початковий стан анімації (від 0 до 1)
 
 
     def scale_background(self):
@@ -121,31 +125,37 @@ class Scene:
             overflow_x = new_width - screen_width
             overflow_y = new_height - screen_height
 
-            # Визначаємо можливі напрямки руху
-            possible_directions = []
-            if overflow_x > 0:
-                possible_directions.extend(["left", "right"])
-            if overflow_y > 0:
-                possible_directions.extend(["up", "down"])
+            if self.should_move:  # Перевіряємо, чи потрібно рухати фон
+                overflow_x = new_width - screen_width
+                overflow_y = new_height - screen_height
 
-            # Випадково обираємо один з можливих напрямків руху
-            move_direction = random.choice(possible_directions)
+                # Визначаємо можливі напрямки руху
+                possible_directions = []
+                if overflow_x > 0:
+                    possible_directions.extend(["left", "right"])
+                if overflow_y > 0:
+                    possible_directions.extend(["up", "down"])
 
-            if move_direction == "left":
-                self.bg_start_pos = (0, -overflow_y // 2)
-                self.bg_end_pos = (-overflow_x, -overflow_y // 2)
-            elif move_direction == "right":
-                self.bg_start_pos = (-overflow_x, -overflow_y // 2)
-                self.bg_end_pos = (0, -overflow_y // 2)
-            elif move_direction == "up":
-                self.bg_start_pos = (-overflow_x // 2, 0)
-                self.bg_end_pos = (-overflow_x // 2, -overflow_y)
-            elif move_direction == "down":
-                self.bg_start_pos = (-overflow_x // 2, -overflow_y)
-                self.bg_end_pos = (-overflow_x // 2, 0)
+                # Випадково обираємо один з можливих напрямків руху
+                move_direction = random.choice(possible_directions)
 
-            # Початкова позиція
-            self.bg_pos = self.bg_start_pos
+                if move_direction == "left":
+                    self.bg_start_pos = (0, -overflow_y // 2)
+                    self.bg_end_pos = (-overflow_x, -overflow_y // 2)
+                elif move_direction == "right":
+                    self.bg_start_pos = (-overflow_x, -overflow_y // 2)
+                    self.bg_end_pos = (0, -overflow_y // 2)
+                elif move_direction == "up":
+                    self.bg_start_pos = (-overflow_x // 2, 0)
+                    self.bg_end_pos = (-overflow_x // 2, -overflow_y)
+                elif move_direction == "down":
+                    self.bg_start_pos = (-overflow_x // 2, -overflow_y)
+                    self.bg_end_pos = (-overflow_x // 2, 0)
+
+                # Початкова позиція
+                self.bg_pos = self.bg_start_pos
+            else:
+                self.should_move = False
 
 
     def play_music(self):
@@ -193,43 +203,43 @@ class Scene:
         _, text_duration, _ = self.texts[self.current_text_index]
         elapsed_text_time = time.time() - self.text_start_time
 
-        if time.time() - self.text_start_time >= text_duration:
+        if elapsed_text_time >= text_duration:
             self.skip_text()
 
+        self.elapsed_time += 1 / 60  # Оновлюємо таймер
 
-        self.elapsed_time += 1 / 60  # Оновлюємо таймер як зазвичай
+        if self.current_bg_index < len(self.backgrounds):  # Переконуємось, що індекс в межах списку
+            current_bg_duration = self.backgrounds[self.current_bg_index][1]
+            time_since_bg_start = self.elapsed_time - self.bg_start_time
 
-        current_bg_duration = self.backgrounds[self.current_bg_index][1]
-        time_since_bg_start = self.elapsed_time - self.bg_start_time
+            # ✅ Обробка fade-in
+            if not paused and self.fade_state == "fade_in" and time_since_bg_start < self.fade_in_duration:
+                fade_step = int(255 / (self.fade_in_duration * 60))
+                self.bg_alpha = min(255, self.bg_alpha + fade_step)
 
-        # ✅ Обробка fade-in
-        if not paused and self.fade_state == "fade_in" and time_since_bg_start < self.fade_in_duration:
-            fade_step = int(255 / (self.fade_in_duration * 60))
-            self.bg_alpha = min(255, self.bg_alpha + fade_step)
+                if self.bg_alpha >= 255:
+                    self.fade_state = None
 
-            if self.bg_alpha >= 255:
-                self.fade_state = None
+            # ✅ Обробка fade-out перед зміною фону
+            fade_out_start_time = current_bg_duration - self.fade_out_duration
+            if not paused and self.fade_out_duration > 0 and time_since_bg_start >= fade_out_start_time:
+                self.fade_state = "fade_out"
 
-        # ✅ Обробка fade-out перед зміною фону
-        fade_out_start_time = current_bg_duration - self.fade_out_duration
-        if not paused and self.fade_out_duration > 0 and time_since_bg_start >= fade_out_start_time:
-            self.fade_state = "fade_out"
+            if not paused and self.fade_state == "fade_out":
+                fade_step = int(255 / (self.fade_out_duration * 60))
+                self.bg_alpha = max(0, self.bg_alpha - fade_step)
 
-        if not paused and self.fade_state == "fade_out":
-            fade_step = int(255 / (self.fade_out_duration * 60))
-            self.bg_alpha = max(0, self.bg_alpha - fade_step)
+                if self.bg_alpha <= 0:
+                    self.current_bg_index += 1
+                    if self.current_bg_index < len(self.backgrounds):
+                        self.load_background(self.current_bg_index)
 
-            if self.bg_alpha <= 0:
-                self.current_bg_index += 1
-                if self.current_bg_index < len(self.backgrounds):
-                    self.load_background(self.current_bg_index)
-
-        # ✅ Оновлення руху фону
-        progress = min(1, time_since_bg_start / current_bg_duration)
-        self.bg_pos = (
-            self.bg_start_pos[0] + (self.bg_end_pos[0] - self.bg_start_pos[0]) * progress,
-            self.bg_start_pos[1] + (self.bg_end_pos[1] - self.bg_start_pos[1]) * progress
-        )
+            if self.should_move:
+                progress = min(1, time_since_bg_start / current_bg_duration)
+                self.bg_pos = (
+                    self.bg_start_pos[0] + (self.bg_end_pos[0] - self.bg_start_pos[0]) * progress,
+                    self.bg_start_pos[1] + (self.bg_end_pos[1] - self.bg_start_pos[1]) * progress
+                )
 
         self.render()
 
@@ -259,9 +269,6 @@ class Scene:
         # Якщо ще є фони для показу – сцена не завершена
         if self.current_bg_index < len(self.backgrounds) - 1:
             return False
-
-        # Отримуємо загальний час останнього фону
-        last_bg_duration = self.backgrounds[-1][1]
 
         # Якщо загальний час сцени ще не закінчився – продовжуємо
         if self.elapsed_time < sum(bg[1] for bg in self.backgrounds):

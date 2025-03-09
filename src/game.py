@@ -2,8 +2,7 @@ import pygame
 import sys
 from menu import PauseMenu  # Меню паузи
 from scene_intro import IntroScene  # Вступна сцена
-import json
-
+import hero_creator
 
 class Game:
     def __init__(self, screen, game_settings):
@@ -89,9 +88,9 @@ class Game:
 
     def start_level(self):
         """Запускає рівень після завершення сцени"""
-        print("Сцена завершена, запускаємо рівень!")
-        self.scene = None
-        self.scene_playing = False
+        print("Інтро завершено, запускаємо перший рівень!")
+        self.scene = IntroScene(self.screen, self.game_settings)
+        self.scene_playing = True  # Активуємо рівень як сцену
 
     def show_pause_menu(self):
         """Меню паузи"""
