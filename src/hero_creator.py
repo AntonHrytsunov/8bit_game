@@ -18,6 +18,28 @@ class HeroCreator:
         self.running = True
         self.finished = False  # Додаємо, щоб гра знала, коли персонажа створено
 
+        # Завантажуємо фон
+        self.bg_image = pygame.image.load("../assets/scene/intro/black.png").convert_alpha()
+        self.bg_scaled = self.scale_background(self.bg_image, screen.get_size())
+
+    def scale_background(self, image, screen_size):
+        """Масштабує зображення, щоб воно заповнювало весь екран і його нижній край співпадав з екраном."""
+        img_width, img_height = image.get_size()
+        screen_width, screen_height = screen_size
+
+        # Масштабування з урахуванням пропорцій
+        scale_factor = max(screen_width / img_width, screen_height / img_height)
+        new_width = int(img_width * scale_factor)
+        new_height = int(img_height * scale_factor)
+
+        scaled_image = pygame.transform.smoothscale(image, (new_width, new_height))
+
+        # Вираховуємо позицію, щоб нижній край зображення співпадав з нижнім краєм екрану
+        x_offset = (screen_width - new_width) // 2
+        y_offset = screen_height - new_height  # Нижній край вирівняний
+
+        return scaled_image, (x_offset, y_offset)
+
     def handle_events(self, event):
         """Обробляє натискання клавіш для вибору параметрів."""
         if event.type == pygame.KEYDOWN:
@@ -43,14 +65,16 @@ class HeroCreator:
         self.render()
 
     def render(self):
-        """Малює інтерфейс вибору персонажа."""
-        self.screen.fill((0, 0, 0))
+        """Малює фон і інтерфейс вибору персонажа."""
+        # Малюємо фон
+        self.screen.blit(*self.bg_scaled)
 
+        # Малюємо текст
         title = self.font.render("Створення персонажа", True, (255, 255, 255))
         class_text = self.font.render(f"Клас: {self.classes[self.selected_class]}", True, (200, 200, 200))
         race_text = self.font.render(f"Раса: {self.races[self.selected_race]}", True, (200, 200, 200))
         color_text = self.font.render(f"Колір одягу: {self.colors[self.selected_color]}", True, (200, 200, 200))
-        instructions = self.font.render("Інструкції", True, (150, 150, 150))
+        instructions = self.font.render("Інструкції: Стрілки - вибір, SPACE - колір, ENTER - підтвердити", True, (150, 150, 150))
 
         self.screen.blit(title, (50, 50))
         self.screen.blit(class_text, (50, 150))

@@ -10,8 +10,8 @@ class IntroScene(Scene):
                 ("../assets/scene/intro/image2.png", 23, 2, 2, True, "down"),
                 ("../assets/scene/intro/image3.png", 30, 2, 2, True),
                 ("../assets/scene/intro/image4.png", 15, 1, 4, True),
-                ("../assets/scene/intro/image5.png", 18, 1, 4, True),
-                ("../assets/scene/intro/black.png", 7, 4, 0, False, "up")
+                ("../assets/scene/intro/image5.png", 18, 1, 4, True, "up"),
+                ("../assets/scene/intro/black.png", 7, 4, 0, False)
             ],
             texts=[
                 # Перше зображення
