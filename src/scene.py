@@ -185,6 +185,9 @@ class Scene:
         if self.paused:
             self.paused = False  # Виходимо з паузи
 
+        if self.elapsed_time >= sum(text[1] for text in self.texts[:self.current_text_index + 1]):
+            self.skip_text()
+
         self.elapsed_time += 1 / 60  # Оновлюємо таймер як зазвичай
 
         current_bg_duration = self.backgrounds[self.current_bg_index][1]
