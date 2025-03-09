@@ -12,8 +12,8 @@ class Scene:
         self.music_file = music_file
         self.current_text_index = 0
         self.current_bg_index = 0
-        self.elapsed_time = 0  # Наш власний таймер
-        self.paused = False  # Статус паузи
+        self.elapsed_time = 0
+        self.paused = False
         self.font = pygame.font.Font(None, 36)
 
         self.screen_resolution = tuple(game_settings.get("resolution"))
@@ -22,6 +22,19 @@ class Scene:
         self.bg_image = None
         self.bg_scaled = None
         self.bg_pos = (0, 0)
+
+        self.bg_alpha = 255
+        self.fade_in_duration = 0
+        self.fade_out_duration = 0
+        self.fade_state = None
+        self.bg_start_time = 0
+
+        self.bg_start_pos = (0, 0)
+        self.bg_end_pos = (0, 0)
+
+        self.paused_time = 0  # Час, коли була поставлена пауза
+        self.last_update_time = 0  # Останній момент оновлення
+
         self.load_background(self.current_bg_index)
         if self.music_file:
             self.play_music()
@@ -29,17 +42,26 @@ class Scene:
     def load_background(self, index):
         """Завантажує фон за його індексом у списку `backgrounds`."""
         if index < len(self.backgrounds):
-            bg_path, _ = self.backgrounds[index]
+            bg_path, duration, fade_in_duration, fade_out_duration = self.backgrounds[index]
             try:
-                self.bg_image = pygame.image.load(bg_path)
-                self.scale_background()  # ✅ Масштабуємо фон
+                self.bg_image = pygame.image.load(bg_path).convert_alpha()
+                self.scale_background()
 
                 if self.bg_scaled is None:
                     print(f"Помилка: фон {bg_path} не завантажився правильно!")
 
-                self.bg_start_time = self.elapsed_time  # ✅ Використовуємо наш таймер
-                self.bg_elapsed_time = 0  # ✅ Таймер для контролю зміни фону
-                self.set_background_animation()  # ✅ Запускаємо рух
+                # Встановлення параметрів fade-in та fade-out
+                self.fade_in_duration = min(fade_in_duration, duration)  # fade-in не може бути довшим за фон
+                self.fade_out_duration = min(fade_out_duration, duration)  # fade-out не може бути довшим за фон
+                self.bg_start_time = self.elapsed_time  # Оновлюємо час початку фону
+
+                # Якщо fade-in активний, починаємо з прозорого зображення
+                if self.fade_in_duration > 0:
+                    self.bg_alpha = 0
+                    self.fade_state = "fade_in"
+                else:
+                    self.bg_alpha = 255
+                    self.fade_state = None  # Якщо fade-in нема, просто показуємо зображення
 
             except pygame.error:
                 print(f"Помилка завантаження фону: {bg_path}")
@@ -76,6 +98,7 @@ class Scene:
                 self.bg_end_pos = (-overflow_x // 2, 0)
 
             self.bg_pos = self.bg_start_pos
+
 
     def scale_background(self):
         """Масштабує фон, зберігаючи пропорції, та налаштовує анімацію руху."""
@@ -134,14 +157,17 @@ class Scene:
         except pygame.error:
             print(f"Помилка завантаження музичного файлу: {self.music_file}")
 
+
     def stop_music(self):
         """Зупиняє музику після завершення сцени."""
         pygame.mixer.music.stop()
+
 
     def handle_events(self, event):
         """Обробка подій: при натисканні `Space` перемикає текст."""
         if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
             self.skip_text()
+
 
     def skip_text(self):
         """Пропускає поточний текст і відображає наступний."""
@@ -149,52 +175,63 @@ class Scene:
             self.current_text_index += 1
             self.start_time = time.time()
 
-    def update(self, paused):
-        """Оновлення сцени та правильна зміна фону."""
 
+    def update(self, paused):
+        """Оновлення сцени: рух фону, fade-in, fade-out та зміна фону."""
         if paused:
-            self.paused = True  # Зупиняємо оновлення під час паузи
-            return
+            self.paused = True
+            return  # Не оновлюємо нічого під час паузи
 
         if self.paused:
-            self.paused = False  # Скидаємо статус паузи
+            self.paused = False  # Виходимо з паузи
 
-        # 1️⃣ Оновлення загального часу сцени
-        self.elapsed_time += 1 / 60  # Симулюємо FPS=60 (1 сек = 60 кадрів)
-        self.bg_elapsed_time += 1 / 60  # Таймер для контролю зміни фону
+        self.elapsed_time += 1 / 60  # Оновлюємо таймер як зазвичай
 
-        # 2️⃣ Зміна тексту за таймінгами
-        if self.elapsed_time >= sum(text[1] for text in self.texts[:self.current_text_index + 1]):
-            self.skip_text()
+        current_bg_duration = self.backgrounds[self.current_bg_index][1]
+        time_since_bg_start = self.elapsed_time - self.bg_start_time
 
-        # 3️⃣ Зміна фону за таймінгами
-        if self.current_bg_index < len(self.backgrounds) - 1:
-            next_bg_time = sum(
-                bg[1] for bg in self.backgrounds[:self.current_bg_index + 1])  # Загальний час для поточного фону
+        # ✅ Обробка fade-in
+        if not paused and self.fade_state == "fade_in" and time_since_bg_start < self.fade_in_duration:
+            fade_step = int(255 / (self.fade_in_duration * 60))
+            self.bg_alpha = min(255, self.bg_alpha + fade_step)
 
-            if self.elapsed_time >= next_bg_time:
-                self.current_bg_index += 1  # ✅ Переходимо до наступного фону
-                self.load_background(self.current_bg_index)  # ✅ Завантажуємо його
-                self.set_background_animation()  # ✅ Запускаємо рух
-                self.bg_elapsed_time = 0  # ✅ Скидаємо таймер фону
-                self.render()  # ✅ Оновлюємо екран після зміни фону
+            if self.bg_alpha >= 255:
+                self.fade_state = None
 
-        # 4️⃣ Оновлення позиції фону (анімація руху)
-        progress = min(1, self.bg_elapsed_time / self.backgrounds[self.current_bg_index][1])
+        # ✅ Обробка fade-out перед зміною фону
+        fade_out_start_time = current_bg_duration - self.fade_out_duration
+        if not paused and self.fade_out_duration > 0 and time_since_bg_start >= fade_out_start_time:
+            self.fade_state = "fade_out"
 
+        if not paused and self.fade_state == "fade_out":
+            fade_step = int(255 / (self.fade_out_duration * 60))
+            self.bg_alpha = max(0, self.bg_alpha - fade_step)
+
+            if self.bg_alpha <= 0:
+                self.current_bg_index += 1
+                if self.current_bg_index < len(self.backgrounds):
+                    self.load_background(self.current_bg_index)
+
+        # ✅ Оновлення руху фону
+        progress = min(1, time_since_bg_start / current_bg_duration)
         self.bg_pos = (
             self.bg_start_pos[0] + (self.bg_end_pos[0] - self.bg_start_pos[0]) * progress,
             self.bg_start_pos[1] + (self.bg_end_pos[1] - self.bg_start_pos[1]) * progress
         )
 
+        self.render()
+
 
     def render(self):
-        """Малює сцену на екрані."""
+        """Малює сцену на екрані з fade-in та fade-out ефектами."""
         if self.bg_scaled:
-            self.screen.blit(self.bg_scaled, self.bg_pos)
+            temp_bg = self.bg_scaled.copy()
+            temp_bg.set_alpha(self.bg_alpha)  # ✅ Встановлюємо прозорість
+            self.screen.blit(temp_bg, self.bg_pos)
         else:
-            self.screen.fill(self.background)
+            self.screen.fill((0, 0, 0))
 
+        self.font = self.get_scaled_font()
         text, _ = self.texts[self.current_text_index]
         text_surface = self.font.render(text, True, (255, 255, 255))
 
@@ -202,6 +239,7 @@ class Scene:
 
         self.screen.blit(text_surface, text_rect)
         pygame.display.flip()
+
 
     def is_finished(self):
         """Перевіряє, чи завершилася сцена (всі фони показані повністю)."""
@@ -219,3 +257,20 @@ class Scene:
 
         self.stop_music()  # ✅ Зупиняємо музику після завершення сцени
         return True
+
+
+    def get_scaled_font(self):
+        """Обчислює розмір шрифту залежно від висоти екрану."""
+        screen_height = self.screen_resolution[1]
+        font_size = max(20, int(screen_height * 0.04))  # Мінімальний розмір 20px, але адаптується
+        return pygame.font.Font(None, font_size)
+
+
+    def update_screen_settings(self, new_resolution, fullscreen):
+        """Оновлює розмір екрану та адаптує текст і фон."""
+        if new_resolution == "Максимальна":
+            new_resolution = pygame.display.get_desktop_sizes()[0]  # Отримуємо максимальну роздільну здатність екрану
+            fullscreen = True  # Автоматично включаємо повноекранний режим
+
+        self.screen_resolution = new_resolution
+        self.fullscreen = fullscreen

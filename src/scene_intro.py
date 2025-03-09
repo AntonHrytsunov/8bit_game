@@ -7,10 +7,10 @@ class IntroScene(Scene):
             screen=screen,
             duration=40,  # Загальна тривалість сцени
             backgrounds=[
-                ("../assets/scene/intro/image1.png", 50),
-                ("../assets/scene/intro/image2.png", 50),
-                ("../assets/scene/intro/image3.png", 44),
-                ("../assets/scene/intro/image4.png", 62),
+                ("../assets/scene/intro/image1.png", 5, 2, 2),
+                ("../assets/scene/intro/image2.png", 5, 2, 0.01),
+                ("../assets/scene/intro/image3.png", 5, 2, 2),
+                ("../assets/scene/intro/image4.png", 5, 1, 4),
             ],
             texts=[
                 ("Важкі часи у королівстві головного героя. Часи скорботи, часи втрати.", 10),
