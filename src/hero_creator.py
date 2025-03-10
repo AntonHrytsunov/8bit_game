@@ -1,13 +1,19 @@
 import pygame
 import re
 import random
+import os
+import json
 
 
 class HeroCreator:
     def __init__(self, screen, game_settings):
         self.screen = screen
         self.game_settings = game_settings
-        self.font = pygame.font.Font("../assets/menu_font.otf", 30)
+        self.screen_width, self.screen_height = screen.get_size()
+        self.scale_factor = self.screen_height / 700  # Базовий розмір взято 700px
+
+        self.font_size = int(30 * self.scale_factor)
+        self.font = pygame.font.Font("../assets/menu_font.otf", self.font_size)
 
         self.classes = ["Маг", "Воїн", "Лучник"]
         self.races = ["Людина", "Ельф", "Гном", "Зверолюд"]
@@ -28,19 +34,21 @@ class HeroCreator:
         self.bg_image = pygame.image.load("../assets/scene/intro/black.png").convert_alpha()
         self.bg_scaled = self.scale_background(self.bg_image, screen.get_size())
 
-        # Завантажуємо рамку перед викликом update_character_image()
         try:
             self.frame_image = pygame.image.load("../assets/characters/rama.png").convert_alpha()
         except pygame.error:
             print("Не вдалося завантажити рамку: ../assets/characters/rama.png")
-            self.frame_image = None  # Встановлюємо None у разі помилки
+            self.frame_image = None
 
         self.character_image = None
         self.character_scaled = None
         self.character_pos = None
         self.frame_scaled = None
+        self.text_box_rect = None
+        self.text_font_size = int(24 * self.scale_factor)
+        self.text_font = pygame.font.Font("../assets/menu_font.otf", self.text_font_size)
 
-        self.update_character_image()  # Викликаємо після ініціалізації frame_image
+        self.update_character_image()
 
         self.music_file = "../assets/scene/hero_creator/dark_wood.mp3"
         self.play_music()
@@ -122,6 +130,8 @@ class HeroCreator:
             self.circle_radius = int(frame_width * 0.45)
             self.circle_radius_black = int(frame_width * 0.9)
 
+        self.text_box_rect = pygame.Rect(20, frame_y + frame_height/2, frame_x - 40, frame_height/2)
+
     def scale_character(self, image, screen_size):
         screen_width, screen_height = screen_size
         img_width, img_height = image.get_size()
@@ -139,6 +149,93 @@ class HeroCreator:
 
         return scaled_image, (x_pos, y_pos)
 
+    def draw_text_box(self):
+        if self.text_box_rect:
+            # **Не малюємо фон, а просто рендеримо текст поверх сцени**
+            text = self.get_character_description()
+            lines = self.wrap_text(text, self.text_box_rect.width - 20)
+
+            y_offset = self.text_box_rect.y + 10
+            for line in lines:
+                rendered_text = self.text_font.render(line, True, (255, 255, 255))  # Білий текст без фону
+                self.screen.blit(rendered_text, (self.text_box_rect.x + 10, y_offset))
+                y_offset += self.text_font.get_height()
+
+    def get_character_description(self):
+        file_path = "../assets/characters/characters.txt"
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as file:
+                lines = [line.rstrip() for line in file.readlines()]  # Видаляємо зайві пробіли праворуч
+        except FileNotFoundError:
+            print(f"Помилка: Файл {file_path} не знайдено.")
+            return "Опис відсутній."
+
+        # Визначаємо секцію, яку потрібно знайти ("Чоловіки" або "Жінки")
+        gender_header = "Чоловіки:" if self.genders[self.selected_gender] == "Парубок" else "Жінки:"
+
+        found_gender_section = False  # Чи знайшли секцію Чоловіки/Жінки
+        found_character = False  # Чи знайшли відповідного персонажа
+        description = []  # Опис персонажа
+
+        # Формуємо ключ персонажа: "Клас - Раса"
+        character_key = f"{self.classes[self.selected_class]} - {self.races[self.selected_race]}"
+
+        print(f"Шукаємо: {character_key} у секції {gender_header}")  # Діагностика
+
+        for line in lines:
+            print(f"Читаємо рядок: {line}")  # Дебаг вивід кожного рядка
+
+            # Пошук секції (Чоловіки або Жінки)
+            if not found_gender_section:
+                if line == gender_header:
+                    found_gender_section = True
+                    print(f"✅ Знайдено секцію: {gender_header}")
+                continue
+
+            # Якщо натрапили на інший заголовок (Чоловіки/Жінки), виходимо з пошуку
+            if found_gender_section and (line == "Чоловіки:" or line == "Жінки:"):
+                print(f"⛔ Виявлено новий заголовок ({line}), виходимо з блоку пошуку.")
+                break
+
+            # Якщо вже знайшли потрібного персонажа, записуємо його опис
+            if found_character:
+                if line == "":  # Порожній рядок = кінець опису
+                    print("🔚 Кінець опису персонажа.")
+                    break
+                description.append(line)
+                print(f"➕ Додаємо опис: {line}")
+
+            # Якщо знайшли потрібного персонажа, починаємо записувати опис
+            elif line == character_key:
+                found_character = True
+                print(f"🎯 Знайдено персонажа: {character_key}")
+
+        # Якщо знайдено опис - повертаємо його
+        if description:
+            return " ".join(description)
+        else:
+            print("⚠️ Персонаж не знайдений, повертаємо 'Опис відсутній'")
+            return "Опис відсутній."
+
+    def wrap_text(self, text, max_width):
+        words = text.split()
+        lines = []
+        current_line = ""
+
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            if self.text_font.size(test_line)[0] <= max_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines
+
     def handle_events(self, event):
         if event.type == pygame.KEYDOWN:
             if self.selected_option == 0:
@@ -151,6 +248,9 @@ class HeroCreator:
                             self.input_name += char.upper()
                         else:
                             self.input_name += char.lower()
+            if self.selected_option == 4:
+                if event.key == pygame.K_RETURN:
+                    self.save_hero()
 
             if event.key == pygame.K_UP:
                 self.selected_option = (self.selected_option - 1) % len(self.menu_options)
@@ -185,13 +285,13 @@ class HeroCreator:
 
     def render(self):
         self.screen.blit(*self.bg_scaled)
-        y_offset = 100
+        y_offset = int(self.screen_height*0.05)
 
         for i, option in enumerate(self.menu_options):
             color = (255, 255, 255) if i == self.selected_option else (200, 200, 200)
 
             if option == "Ім'я":
-                text = f"Ім'я: {self.input_name if self.input_name else 'Герой'}"
+                text = f"Ім'я: {self.input_name if self.input_name else self.random_name}"
             elif option == "Клас":
                 text = f"Клас: {self.classes[self.selected_class]}"
             elif option == "Раса":
@@ -203,10 +303,12 @@ class HeroCreator:
 
             rendered_text = self.font.render(text, True, color)
             self.screen.blit(rendered_text, (50, y_offset))
-            y_offset += 70
+            y_offset += int(self.screen_height*0.1)
+
+        self.draw_text_box()
 
         if self.character_scaled:
-            self.draw_gradient_circle(self.screen, self.circle_center, self.circle_radius_black, 0, 0, 50, 255)
+            self.draw_gradient_circle(self.screen, self.circle_center, self.circle_radius_black, 20, 20, 40, 255)
             self.draw_gradient_circle(self.screen, self.circle_center, self.circle_radius, 255, 255, 255, 255)
             self.screen.blit(self.character_scaled, self.character_pos)
 
@@ -217,13 +319,25 @@ class HeroCreator:
 
     def save_hero(self):
         hero_data = {
-            "name": self.input_name,
+            "name": self.input_name if self.input_name else self.random_name,
             "class": self.classes[self.selected_class],
             "race": self.races[self.selected_race],
             "gender": self.genders[self.selected_gender],
+            "hero_create": "done"
         }
-        self.game_settings["hero"] = hero_data
-        print("Персонаж створений:", hero_data)
+
+        save_dir = "../game_save/"
+
+        # Отримуємо список усіх файлів з розширенням .sav
+        save_files = [f for f in os.listdir(save_dir) if f.endswith(".sav")]
+
+        if save_files:
+            save_path = os.path.join(save_dir, save_files[0])  # Беремо перший .sav файл
+            with open(save_path, "w", encoding="utf-8") as save_file:
+                json.dump(hero_data, save_file, ensure_ascii=False, indent=4)
+            print("Персонаж збережений у файл:", save_path)
+        else:
+            print("Помилка: Файл .sav не знайдено у каталозі game_save.")
 
     def is_finished(self):
         return self.finished

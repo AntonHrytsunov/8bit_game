@@ -90,7 +90,7 @@ class Game:
 
     def start_level(self):
         """Запускає рівень після завершення сцени"""
-        print("Інтро завершено, запускаємо перший рівень!")
+        print("Інтро завершено, запускаємо меню створення персонажу!")
         self.scene = HeroCreator(self.screen, self.game_settings)
         self.scene_playing = True  # Активуємо рівень як сцену
 
