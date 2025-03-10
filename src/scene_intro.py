@@ -2,6 +2,7 @@ from scene import Scene
 
 class IntroScene(Scene):
     def __init__(self, screen, game_settings):
+        self.scene_finished = False
         """Сцена інтро, що успадковує Scene."""
         super().__init__(
             screen=screen,

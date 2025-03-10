@@ -179,15 +179,27 @@ class Scene:
             print(f"Помилка завантаження музичного файлу: {self.music_file}")
 
 
-    def stop_music(self):
-        """Зупиняє музику після завершення сцени."""
-        pygame.mixer.music.stop()
+    def stop_music_fadeout(self, fade_duration=3000):
+        """Плавно зупиняє музику із затуханням."""
+        if pygame.mixer.music.get_busy():  # Якщо музика ще грає
+            pygame.mixer.music.fadeout(fade_duration)
 
 
     def handle_events(self, event):
-        """Обробка подій: при натисканні `Space` перемикає текст."""
-        if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-            self.skip_text()
+        """Обробка подій: `Space` пропускає текст, `T` завершує сцену."""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                self.skip_text()
+            elif event.key == pygame.K_t:
+                self.end_scene()
+
+    def end_scene(self):
+        """Миттєво завершує сцену."""
+        self.scene_finished = True
+        self.stop_music_fadeout()  # Плавне вимкнення музики
+        self.elapsed_time = sum(bg[1] for bg in self.backgrounds)  # Перемотуємо час до кінця
+        self.current_bg_index = len(self.backgrounds)  # Пропускаємо всі фони
+        self.current_text_index = len(self.texts)  # Пропускаємо всі тексти
 
 
     def skip_text(self):
@@ -203,12 +215,18 @@ class Scene:
 
     def update(self, paused):
         """Оновлення сцени: рух фону, fade-in, fade-out та зміна фону."""
+        if self.scene_finished:
+            return  # Якщо сцена завершена, не малюємо нічого
+
         if paused:
             self.paused = True
             return  # Не оновлюємо нічого під час паузи
 
         if self.paused:
             self.paused = False  # Виходимо з паузи
+
+        if self.current_text_index >= len(self.texts):  # Перевіряємо, чи є ще текст
+            return
 
         _, text_duration, _ = self.texts[self.current_text_index]
         elapsed_text_time = time.time() - self.text_start_time
@@ -217,6 +235,12 @@ class Scene:
             self.skip_text()
 
         self.elapsed_time += 1 / 60  # Оновлюємо таймер
+
+        total_scene_duration = sum(bg[1] for bg in self.backgrounds)  # Загальний час сцени
+        fade_music_start_time = total_scene_duration - 3  # Початок затухання за 3 сек до кінця сцени
+
+        if self.elapsed_time >= fade_music_start_time and self.music_file:
+            self.stop_music_fadeout()  # 🔹 Запускаємо затухання музики перед кінцем сцени
 
         if self.current_bg_index < len(self.backgrounds):  # Переконуємось, що індекс в межах списку
             current_bg_duration = self.backgrounds[self.current_bg_index][1]
@@ -256,6 +280,9 @@ class Scene:
 
     def render(self):
         """Малює сцену на екрані з fade-in та fade-out ефектами."""
+        if self.scene_finished:
+            return  # Якщо сцена завершена, нічого не малюємо
+
         if self.bg_scaled:
             temp_bg = self.bg_scaled.copy()
             temp_bg.set_alpha(self.bg_alpha)  # ✅ Встановлюємо прозорість
@@ -263,22 +290,25 @@ class Scene:
         else:
             self.screen.fill((0, 0, 0))
 
-        self.font = self.get_scaled_font()
-        text, _, _ = self.texts[self.current_text_index]
-        text_surface = self.font.render(text, True, (255, 255, 255))
+        # Перевіряємо, чи є ще текст для відображення
+        if self.current_text_index < len(self.texts):
+            self.font = self.get_scaled_font()
+            text, _, _ = self.texts[self.current_text_index]
+            text_surface = self.font.render(text, True, (255, 255, 255))
 
-        text_rect = text_surface.get_rect(center=(self.screen_resolution[0] // 2, self.screen_resolution[1] - 100))
-        if text.strip():
-            padding = 10  # Відступи довкола тексту
-            bg_rect = pygame.Rect(text_rect.left - padding, text_rect.top - padding,
-                              text_rect.width + padding * 2, text_rect.height + padding * 2)
+            text_rect = text_surface.get_rect(center=(self.screen_resolution[0] // 2, self.screen_resolution[1] - 100))
+            if text.strip():
+                padding = 10  # Відступи довкола тексту
+                bg_rect = pygame.Rect(text_rect.left - padding, text_rect.top - padding,
+                                      text_rect.width + padding * 2, text_rect.height + padding * 2)
 
-        # Створюємо поверхню для фону
-            text_bg = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
-            text_bg.fill((0, 0, 0, 150))
-            self.screen.blit(text_bg, bg_rect.topleft)
+                # Створюємо поверхню для фону
+                text_bg = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+                text_bg.fill((0, 0, 0, 150))
+                self.screen.blit(text_bg, bg_rect.topleft)
 
-        self.screen.blit(text_surface, text_rect)
+            self.screen.blit(text_surface, text_rect)
+
         pygame.display.flip()
 
 
@@ -293,7 +323,7 @@ class Scene:
         if self.elapsed_time < sum(bg[1] for bg in self.backgrounds):
             return False
 
-        self.stop_music()  # ✅ Зупиняємо музику після завершення сцени
+        self.stop_music_fadeout()  # ✅ Зупиняємо музику після завершення сцени
         return True
 
 
